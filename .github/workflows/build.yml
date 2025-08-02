@@ -1,0 +1,23 @@
+name: Build Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Show Swift version
+        run: |
+          sw_vers
+          swift --version
+
+      - name: Build project
+        run: |
+          swift build --configuration release

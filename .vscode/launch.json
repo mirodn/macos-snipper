@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:macos-snipper}",
+            "name": "Debug macos-snipper",
+            "program": "${workspaceFolder:macos-snipper}/.build/debug/macos-snipper",
+            "preLaunchTask": "swift: Build Debug macos-snipper"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:macos-snipper}",
+            "name": "Release macos-snipper",
+            "program": "${workspaceFolder:macos-snipper}/.build/release/macos-snipper",
+            "preLaunchTask": "swift: Build Release macos-snipper"
+        }
+    ]
+}

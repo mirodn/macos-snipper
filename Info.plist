@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>CFBundleExecutable</key>
+        <string>macos-snipper</string>
+        <key>CFBundleIdentifier</key>
+        <string>com.miro.macos-snipper</string>
+        <key>CFBundleName</key>
+        <string>macOS Snipper</string>
+        <key>CFBundleVersion</key>
+        <string>1.0</string>
+        <key>CFBundleShortVersionString</key>
+        <string>1.0</string>
+        <key>LSMinimumSystemVersion</key>
+        <string>14.0</string>
+        <key>LSUIElement</key>
+        <true/>
+        <key>NSScreenCaptureUsageDescription</key>
+        <string>This app requires screen recording permission to take screenshots.</string>
+        <key>NSInputMonitoringUsageDescription</key>
+        <string>This app needs input monitoring permission to detect global hotkeys.</string>
+    </dict>
+</plist>
