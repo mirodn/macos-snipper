@@ -2,7 +2,6 @@ import Foundation
 
 struct UserSettings {
     private static let savePathKey = "savePath"
-    private static let launchAtLoginKey = "launchAtLogin"
 
     static var savePath: URL {
         get {
@@ -15,15 +14,6 @@ struct UserSettings {
         }
         set {
             UserDefaults.standard.set(newValue, forKey: savePathKey)
-        }
-    }
-
-    static var launchAtLogin: Bool {
-        get {
-            return UserDefaults.standard.bool(forKey: launchAtLoginKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: launchAtLoginKey)
         }
     }
 }
