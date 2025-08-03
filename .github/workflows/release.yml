@@ -20,6 +20,10 @@ jobs:
           sw_vers
           swift --version
 
+      - name: Install create-dmg
+        run: |
+          brew install create-dmg
+
       - name: Build app bundle
         run: |
           make bundle
@@ -31,6 +35,4 @@ jobs:
       - name: Upload DMG to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: macos-snipper.dmg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: ma
