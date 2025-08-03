@@ -1,3 +1,5 @@
+### README not updated
+
 # macos-snipper
 
 A lightweight **open-source screenshot tool for macOS**, inspired by Windows Snipping Tool.
