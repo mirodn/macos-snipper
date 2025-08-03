@@ -6,7 +6,7 @@ on:
       - 'v*' # Trigger on version tags like v1.0.0
 
 permissions:
-  contents: write # Allow writing to repository contents
+  contents: write
 
 jobs:
   release:
@@ -20,19 +20,21 @@ jobs:
           sw_vers
           swift --version
 
-      - name: Install create-dmg
-        run: |
-          brew install create-dmg
-
-      - name: Build app bundle
+      - name: Build App Bundle
         run: |
           make bundle
 
-      - name: Create DMG
+      - name: Create DMG using hdiutil
         run: |
-          make dmg
+          echo "Creating DMG..."
+          DMG_NAME="macos-snipper.dmg"
+          hdiutil create -volname "macos-snipper" \
+            -srcfolder ".build/release/macos-snipper.app" \
+            -ov -format UDZO "$DMG_NAME"
 
       - name: Upload DMG to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ma
+          files: macos-snipper.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
