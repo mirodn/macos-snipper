@@ -1,23 +1,27 @@
-### README not updated
-
 # macos-snipper
 
 A lightweight **open-source screenshot tool for macOS**, inspired by Windows Snipping Tool.
 
-## Features
+## Features Implementation Status
 
-- Global Hotkey: **Ctrl + Option + Cmd + S** → Fullscreen screenshot to clipboard
-- Menubar App (no Dock icon)
-- Built with Swift & SwiftPM
-- Open Source and easy to extend
+| Feature               |  Status |
+| --------------------- |  ------ |
+| Global Hotkey: **Shift + Ctrl + S** → Fullscreen screenshot to clipboard | ✅  |
+| Menubar App (no Dock icon) | ✅ |
+| Custom Save Path: Screenshots automatically stored in a chosen folder | ✅ |
+| App Icon & DMG Installer for a native macOS feel |  ✅ |
+| Region selection (drag to capture part of the screen)   | ❌ |
+| Custom File Naming: Include timestamps    |  ❌  |
+| Multiple Output Formats   |  ❌     |
+| Cloud Upload Integration        |   ❌     |
 
-## Roadmap
+## Hotkeys
 
-- Region selection (drag to capture part of the screen)
-- Annotation tools (draw, highlight)
-- Screenshot history
-- Multiple output formats (PNG, JPG, PDF)
-- Cloud upload integration
+| Action            |  Shortcut |
+| --------------------- |  ------ |
+| Fullscreen Shot| `Shift + Ctrl + S` |
+
+> (Custom hotkeys coming soon!)
 
 ## Installation
 
