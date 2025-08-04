@@ -3,7 +3,7 @@ name: Release macOS App and DMG
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags like v1.0.0
+      - 'v*'  # z.B. v1.0.0
 
 permissions:
   contents: write
@@ -15,26 +15,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Show Swift version
+      - name: Setup Swift
+        uses: fwal/setup-swift@v2
+        with:
+          swift-version: '5.9'
+
+      - name: Show versions
         run: |
           sw_vers
           swift --version
 
-      - name: Build App Bundle
-        run: |
-          make bundle
+      - name: Install create-dmg
+        run: brew install create-dmg
 
-      - name: Create DMG using hdiutil
-        run: |
-          echo "Creating DMG..."
-          DMG_NAME="macos-snipper.dmg"
-          hdiutil create -volname "macos-snipper" \
-            -srcfolder ".build/release/macos-snipper.app" \
-            -ov -format UDZO "$DMG_NAME"
+      - name: Build & Package
+        run: make dmg
 
-      - name: Upload DMG to GitHub Release
+      - name: Create GitHub Release
+        id: ghrel
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           files: macos-snipper.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
