@@ -1,4 +1,5 @@
 import Cocoa
+import AudioToolbox 
 
 class ScreenshotService {
     static let shared = ScreenshotService()
@@ -17,7 +18,9 @@ class ScreenshotService {
         // Save to custom or default folder
         saveScreenshot(nsImage)
 
-        print("📸 Screenshot copied to clipboard and saved!")
+        AudioServicesPlaySystemSound(1108) // Play camera shutter sound
+
+        print("Screenshot copied to clipboard and saved!")
     }
 
     private func copyToClipboard(_ image: NSImage) {

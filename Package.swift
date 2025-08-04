@@ -4,12 +4,15 @@ import PackageDescription
 let package = Package(
     name: "macos-snipper",
     platforms: [
-        .macOS(.v14) // macOS Sonoma and newer (works on Sequoia)
+        .macOS(.v14)
     ],
     targets: [
         .executableTarget(
             name: "macos-snipper",
-            path: "Sources"
+            path: "Sources",
+            linkerSettings: [
+                .linkedFramework("AudioToolbox")
+            ]
         )
     ]
 )
