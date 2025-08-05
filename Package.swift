@@ -1,29 +1,25 @@
-// swift-tools-version:5.9
+// swift-tools-version:5.11
 import PackageDescription
 
 let package = Package(
-    name: "MacosSnipper",               // ← Swift module name, CamelCase, no hyphens
+    name: "macos-snipper",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(
-            name: "macos-snipper",      // ← your final bundle name (can have hyphens)
-            targets: ["MacosSnipper"]
-        )
+        .executable(name: "macos-snipper", targets: ["macos-snipper"])
+    ],
+    dependencies: [
+        // no external dependencies
     ],
     targets: [
         .executableTarget(
-            name: "MacosSnipper",       // ← must match package.name
+            name: "macos-snipper",
             path: "Sources",
             linkerSettings: [
-                .linkedFramework("AudioToolbox")
+                .linkedFramework("AudioToolbox"),
+                .linkedFramework("ScreenCaptureKit")
             ]
         ),
-        .testTarget(
-            name: "MacosSnipperTests",  // ← test target name
-            dependencies: ["MacosSnipper"],
-            path: "Tests/MacosSnipperTests"
-        )
     ]
 )

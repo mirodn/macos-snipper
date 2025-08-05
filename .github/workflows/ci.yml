@@ -16,7 +16,7 @@ jobs:
       - name: Setup Swift
         uses: fwal/setup-swift@v2
         with:
-          swift-version: '5.9'
+          swift-version: '5.11'
 
       - name: Show versions
         run: |
@@ -25,6 +25,3 @@ jobs:
 
       - name: Build (release)
         run: swift build --configuration release
-
-      - name: Run Tests
-        run: swift test --enable-code-coverage

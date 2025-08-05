@@ -1,40 +1,43 @@
 import Cocoa
 
-class AppDelegate: NSObject, NSApplicationDelegate {
-    var statusItem: NSStatusItem!
-    var preferencesWindow: PreferencesWindowController?
+/// Application delegate manages the status‐bar item and responds to menu actions.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusItem: NSStatusItem!
+    private var preferencesWindow: PreferencesWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        setupMenuBar()
-        HotkeyManager.shared.startListening()
-        print("macOS Snipper started!")
+        configureStatusItem()
+        HotkeyManager.shared.startGlobalHotkeyMonitor()
     }
 
-    private func setupMenuBar() {
+    private func configureStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-
-        if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "camera", accessibilityDescription: "Screenshot")
-            button.toolTip = "macOS Snipper"
-        }
+        statusItem.button?.image = NSImage(systemSymbolName: "camera", accessibilityDescription: "Screenshot")
+        statusItem.button?.toolTip = "macOS Snipper"
 
         let menu = NSMenu()
-
-        menu.addItem(NSMenuItem(title: "Take Screenshot", action: #selector(takeScreenshot), keyEquivalent: "s"))
-        menu.addItem(NSMenuItem(title: "Preferences", action: #selector(showPreferences), keyEquivalent: ","))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "About", action: #selector(showAbout), keyEquivalent: ""))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
-
+        menu.addItem(.init(title: "Take Screenshot", action: #selector(takeScreenshot), keyEquivalent: "s"))
+        menu.addItem(.init(title: "Preferences…", action: #selector(showPreferences), keyEquivalent: ","))
+        menu.addItem(.separator())
+        menu.addItem(.init(title: "About Snipper", action: #selector(showAbout), keyEquivalent: ""))
+        menu.addItem(.separator())
+        menu.addItem(.init(title: "Quit Snipper", action: #selector(quitApp), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 
-    @objc func takeScreenshot() {
-        ScreenshotService.shared.captureFullScreen()
+    @objc private func takeScreenshot() {
+        Task { @MainActor in
+            switch UserSettings.captureMode {
+            case .full:
+                await ScreenshotService.shared.captureFullScreen()
+            case .area:
+                await ScreenshotService.shared.captureAreaSelection()
+            }
+        }
     }
 
-    @objc func showPreferences() {
+    @objc private func showPreferences() {
         if preferencesWindow == nil {
             preferencesWindow = PreferencesWindowController()
         }
@@ -42,16 +45,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc func showAbout() {
+    @objc private func showAbout() {
         let alert = NSAlert()
         alert.messageText = "macOS Snipper v1.0"
-        alert.informativeText = "Lightweight open-source screenshot tool for macOS."
+        alert.informativeText = "Lightweight, open-source screenshot tool for macOS."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }
 
-    @objc func quitApp() {
+    @objc private func quitApp() {
         NSApplication.shared.terminate(nil)
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 }
