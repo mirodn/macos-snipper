@@ -10,8 +10,8 @@ A lightweight **open-source screenshot tool for macOS**, inspired by Windows Sni
 | Menubar App (no Dock icon) | ✅ |
 | Custom Save Path: Screenshots automatically stored in a chosen folder | ✅ |
 | App Icon & DMG Installer for a native macOS feel |  ✅ |
-| Region selection (drag to capture part of the screen)   | ❌ |
-| Custom File Naming: Include timestamps    |  ❌  |
+| Region selection (drag to capture part of the screen)   | ✅ |
+| Include timestamps    |  ✅  |
 | Multiple Output Formats   |  ❌     |
 | Cloud Upload Integration        |   ❌     |
 
