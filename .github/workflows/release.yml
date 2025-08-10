@@ -2,38 +2,58 @@ name: Release macOS App and DMG
 
 on:
   push:
-    tags:
-      - 'v*'  # z.B. v1.0.0
+    tags: ['v*']
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
-    runs-on: macos-latest
+    runs-on: macos-15           
+    timeout-minutes: 25
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Swift
-        uses: fwal/setup-swift@v2
+      # Xcode 16 (macOS 15 SDK). 
+      - uses: maxim-lobanov/setup-xcode@v1
         with:
-          swift-version: '5.9'
+          xcode-version: '16.*'
 
-      - name: Show versions
+      - name: Show toolchain & SDKs
         run: |
+          set -x
           sw_vers
+          xcodebuild -version
+          xcodebuild -showsdks | grep macosx || true
+          which swift
           swift --version
+          echo "TOOLCHAINS=${TOOLCHAINS:-<unset>}"
 
-      - name: Install create-dmg
-        run: brew install create-dmg
+      # Safety: ensure no custom toolchain is set
+      - name: Ensure default Apple toolchain
+        run: |
+          unset TOOLCHAINS
+          echo "TOOLCHAINS cleared"
+
+      - name: Install create-dmg (fast)
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
+          brew install create-dmg
 
       - name: Build & Package
-        run: make dmg
+        timeout-minutes: 12
+        run: |
+          set -euxo pipefail
+          make dmg
+          ls -lah dist || true
+          ls -lah . | grep dmg || true
 
       - name: Create GitHub Release
-        id: ghrel
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
