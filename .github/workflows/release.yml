@@ -13,17 +13,16 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-15           
+    runs-on: macos-15
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
-      # Xcode 16 (macOS 15 SDK). 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.*'
+          xcode-version: '16.*'   # macOS 15 SDK für SCScreenshotManager
 
-      - name: Show toolchain & SDKs
+      - name: Tooling info
         run: |
           set -x
           sw_vers
@@ -31,24 +30,17 @@ jobs:
           xcodebuild -showsdks | grep macosx || true
           which swift
           swift --version
-          echo "TOOLCHAINS=${TOOLCHAINS:-<unset>}"
-
-      # Safety: ensure no custom toolchain is set
-      - name: Ensure default Apple toolchain
-        run: |
-          unset TOOLCHAINS
-          echo "TOOLCHAINS cleared"
 
       - name: Install create-dmg (fast)
         run: |
           export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
           brew install create-dmg
 
-      - name: Build & Package
+      - name: Build & Package (universal)
         timeout-minutes: 12
         run: |
           set -euxo pipefail
-          make dmg
+          make dmg UNIVERSAL=1
           ls -lah dist || true
           ls -lah . | grep dmg || true
 

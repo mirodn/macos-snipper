@@ -1,47 +1,65 @@
 # Makefile
 
-APP_NAME = macos-snipper
-BUILD_DIR = .build/release
-APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
-EXECUTABLE = $(BUILD_DIR)/$(APP_NAME)
+APP_NAME      = macos-snipper
+CONFIG       ?= release
+DIST_DIR      = dist
+APP_BUNDLE    = $(DIST_DIR)/$(APP_NAME).app
 RESOURCES_DIR = Resources
 
-.PHONY: build bundle sign dmg clean
+# UNIVERSAL=1  -> baut arm64 + x86_64 und lipo't sie zusammen
+# sonst: native Arch (auf Intel: x86_64, auf Apple Silicon: arm64)
 
-# Build the executable for x86_64 in release configuration
+.PHONY: build build-universal bundle sign dmg clean
+
+# Native Build (keine Arch-Angabe -> Compiler nimmt Host-Arch)
 build:
-	swift build --arch x86_64 --configuration release
+	@set -euxo pipefail; \
+	swift build -c $(CONFIG) -v
 
-# Create the .app bundle structure
-bundle: build
-	@echo "Creating app bundle..."
-	mkdir -p $(APP_BUNDLE)/Contents/{MacOS,Resources}
-	cp Info.plist $(APP_BUNDLE)/Contents/
-	cp $(EXECUTABLE) $(APP_BUNDLE)/Contents/MacOS/
-	chmod +x $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
-	@if [ -f "$(RESOURCES_DIR)/AppIcon.icns" ]; then \
-	  cp $(RESOURCES_DIR)/AppIcon.icns $(APP_BUNDLE)/Contents/Resources/; \
-	  echo "AppIcon copied"; \
+# Universal Build (nur wenn UNIVERSAL=1 gesetzt)
+build-universal:
+	@set -euxo pipefail; \
+	OUT_ARM="$$(swift build -c $(CONFIG) --arch arm64 --show-bin-path)"; \
+	OUT_X86="$$(swift build -c $(CONFIG) --arch x86_64 --show-bin-path)"; \
+	BIN_ARM="$$OUT_ARM/$(APP_NAME)"; \
+	BIN_X86="$$OUT_X86/$(APP_NAME)"; \
+	mkdir -p "$(DIST_DIR)"; \
+	lipo -create "$$BIN_ARM" "$$BIN_X86" -output "$(DIST_DIR)/$(APP_NAME)"; \
+	file "$(DIST_DIR)/$(APP_NAME)"
+
+# Wählt je nach UNIVERSAL den richtigen Build & Executable
+bundle: $(if $(UNIVERSAL),build-universal,build)
+	@set -euxo pipefail; \
+	rm -rf "$(APP_BUNDLE)"; \
+	mkdir -p "$(APP_BUNDLE)/Contents/MacOS" "$(APP_BUNDLE)/Contents/Resources"; \
+	cp Info.plist "$(APP_BUNDLE)/Contents/Info.plist"; \
+	if [ "$(UNIVERSAL)" = "1" ]; then \
+	  SRC_BIN="$(DIST_DIR)/$(APP_NAME)"; \
 	else \
-	  echo "No AppIcon.icns found, skipping"; \
-	fi
-	@echo "Bundle created at $(APP_BUNDLE)"
+	  BIN_DIR="$$(swift build -c $(CONFIG) --show-bin-path)"; \
+	  SRC_BIN="$$BIN_DIR/$(APP_NAME)"; \
+	fi; \
+	cp "$$SRC_BIN" "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
+	chmod +x "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"; \
+	if [ -f "$(RESOURCES_DIR)/AppIcon.icns" ]; then \
+	  cp "$(RESOURCES_DIR)/AppIcon.icns" "$(APP_BUNDLE)/Contents/Resources/"; \
+	fi; \
+	echo "Bundle: $(APP_BUNDLE)"; \
+	file "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"
 
-# Ad-hoc code signing (for local testing only)
+# Ad-hoc Signatur (kein Keychain/Netz)
 sign: bundle
-	@echo "Signing app (ad-hoc)..."
-	codesign --force --deep --sign - $(APP_BUNDLE)
+	@set -euxo pipefail; \
+	codesign --force --deep --sign - --timestamp=none "$(APP_BUNDLE)"; \
+	codesign -dv --verbose=4 "$(APP_BUNDLE)" || true
 
-# Create a DMG using create-dmg (install via Homebrew if missing)
+# DMG mit create-dmg
 dmg: sign
-	@if ! command -v create-dmg >/dev/null; then \
-	  echo "Please install create-dmg: brew install create-dmg"; \
-	  exit 1; \
-	fi
-	@echo "Creating DMG..."
+	@set -euxo pipefail; \
+	mkdir -p "$(DIST_DIR)"; \
 	create-dmg \
 	  --volname "$(APP_NAME)" \
-	  --volicon "$(RESOURCES_DIR)/AppIcon.icns" \
+	  $(if $(wildcard $(RESOURCES_DIR)/AppIcon.icns),--volicon "$(RESOURCES_DIR)/AppIcon.icns",) \
 	  --window-pos 200 120 \
 	  --window-size 600 400 \
 	  --icon-size 100 \
@@ -49,9 +67,8 @@ dmg: sign
 	  --icon "$(APP_NAME).app" 150 200 \
 	  --app-drop-link 450 200 \
 	  "$(APP_NAME).dmg" \
-	  "$(BUILD_DIR)"
-	@echo "DMG created: $(APP_NAME).dmg"
+	  "$(DIST_DIR)"; \
+	ls -lah "$(APP_NAME).dmg"
 
-# Clean build artifacts and generated DMG
 clean:
-	rm -rf .build *.dmg
+	rm -rf .build "$(DIST_DIR)" *.dmg
