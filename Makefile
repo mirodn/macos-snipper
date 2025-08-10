@@ -20,10 +20,13 @@ build:
 # Universal Build (arm64 + x86_64, merged with lipo)
 build-universal:
 	@set -euxo pipefail; \
+	swift build -c $(CONFIG) --arch arm64 -v; \
+	swift build -c $(CONFIG) --arch x86_64 -v; \
 	OUT_ARM="$$(swift build -c $(CONFIG) --arch arm64 --show-bin-path)"; \
 	OUT_X86="$$(swift build -c $(CONFIG) --arch x86_64 --show-bin-path)"; \
 	BIN_ARM="$$OUT_ARM/$(APP_NAME)"; \
 	BIN_X86="$$OUT_X86/$(APP_NAME)"; \
+	ls -lah "$$BIN_ARM" "$$BIN_X86"; \
 	mkdir -p "$(DIST_DIR)"; \
 	lipo -create "$$BIN_ARM" "$$BIN_X86" -output "$(DIST_DIR)/$(APP_NAME)"; \
 	file "$(DIST_DIR)/$(APP_NAME)"
