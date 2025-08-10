@@ -1,22 +1,23 @@
 # Makefile
 
-APP_NAME      = macos-snipper
-CONFIG       ?= release
-DIST_DIR      = dist
-APP_BUNDLE    = $(DIST_DIR)/$(APP_NAME).app
-RESOURCES_DIR = Resources
+APP_NAME       = macos-snipper
+CONFIG        ?= release
+DIST_DIR       = dist
+APP_BUNDLE     = $(DIST_DIR)/$(APP_NAME).app
+RESOURCES_DIR  = Resources
+DMG_SRC_DIR    = $(DIST_DIR)/dmg-root   # Temporary folder for DMG contents
 
-# UNIVERSAL=1  -> baut arm64 + x86_64 und lipo't sie zusammen
-# sonst: native Arch (auf Intel: x86_64, auf Apple Silicon: arm64)
+# UNIVERSAL=1 → Builds a universal binary (arm64 + x86_64)
+# Without UNIVERSAL → Builds only for the host architecture
 
-.PHONY: build build-universal bundle sign dmg clean
+.PHONY: build build-universal bundle sign dmg dmg-nobrew clean
 
-# Native Build (keine Arch-Angabe -> Compiler nimmt Host-Arch)
+# Native Build (host architecture only)
 build:
 	@set -euxo pipefail; \
 	swift build -c $(CONFIG) -v
 
-# Universal Build (nur wenn UNIVERSAL=1 gesetzt)
+# Universal Build (arm64 + x86_64, merged with lipo)
 build-universal:
 	@set -euxo pipefail; \
 	OUT_ARM="$$(swift build -c $(CONFIG) --arch arm64 --show-bin-path)"; \
@@ -27,7 +28,7 @@ build-universal:
 	lipo -create "$$BIN_ARM" "$$BIN_X86" -output "$(DIST_DIR)/$(APP_NAME)"; \
 	file "$(DIST_DIR)/$(APP_NAME)"
 
-# Wählt je nach UNIVERSAL den richtigen Build & Executable
+# Create the .app bundle
 bundle: $(if $(UNIVERSAL),build-universal,build)
 	@set -euxo pipefail; \
 	rm -rf "$(APP_BUNDLE)"; \
@@ -44,19 +45,21 @@ bundle: $(if $(UNIVERSAL),build-universal,build)
 	if [ -f "$(RESOURCES_DIR)/AppIcon.icns" ]; then \
 	  cp "$(RESOURCES_DIR)/AppIcon.icns" "$(APP_BUNDLE)/Contents/Resources/"; \
 	fi; \
-	echo "Bundle: $(APP_BUNDLE)"; \
+	echo "Bundle created: $(APP_BUNDLE)"; \
 	file "$(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)"
 
-# Ad-hoc Signatur (kein Keychain/Netz)
+# Ad-hoc sign the .app bundle (no keychain or notarization)
 sign: bundle
 	@set -euxo pipefail; \
 	codesign --force --deep --sign - --timestamp=none "$(APP_BUNDLE)"; \
 	codesign -dv --verbose=4 "$(APP_BUNDLE)" || true
 
-# DMG mit create-dmg
+# Create DMG with create-dmg (only includes the .app bundle)
 dmg: sign
 	@set -euxo pipefail; \
-	mkdir -p "$(DIST_DIR)"; \
+	rm -rf "$(DMG_SRC_DIR)"; \
+	mkdir -p "$(DMG_SRC_DIR)"; \
+	cp -R "$(APP_BUNDLE)" "$(DMG_SRC_DIR)/$(APP_NAME).app"; \
 	create-dmg \
 	  --volname "$(APP_NAME)" \
 	  $(if $(wildcard $(RESOURCES_DIR)/AppIcon.icns),--volicon "$(RESOURCES_DIR)/AppIcon.icns",) \
@@ -67,8 +70,19 @@ dmg: sign
 	  --icon "$(APP_NAME).app" 150 200 \
 	  --app-drop-link 450 200 \
 	  "$(APP_NAME).dmg" \
-	  "$(DIST_DIR)"; \
+	  "$(DMG_SRC_DIR)"; \
 	ls -lah "$(APP_NAME).dmg"
 
+# Create DMG without Homebrew (using hdiutil)
+dmg-nobrew: sign
+	@set -euxo pipefail; \
+	rm -rf "$(DMG_SRC_DIR)"; \
+	mkdir -p "$(DMG_SRC_DIR)"; \
+	cp -R "$(APP_BUNDLE)" "$(DMG_SRC_DIR)/$(APP_NAME).app"; \
+	rm -f "$(APP_NAME).dmg"; \
+	hdiutil create -volname "$(APP_NAME)" -srcfolder "$(DMG_SRC_DIR)" -ov -format UDZO "$(APP_NAME).dmg"; \
+	ls -lah "$(APP_NAME).dmg"
+
+# Clean build artifacts and generated DMGs
 clean:
 	rm -rf .build "$(DIST_DIR)" *.dmg
