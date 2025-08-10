@@ -10,20 +10,34 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-15
+    timeout-minutes: 15
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Swift
-        uses: fwal/setup-swift@v2
+      # Xcode 16 => macOS 15 SDK
+      - uses: maxim-lobanov/setup-xcode@v1
         with:
-          swift-version: '5.9'
+          xcode-version: '16.*'
+
+      # TOOLCHAINS
+      - name: Use default Apple toolchain
+        run: |
+          echo "TOOLCHAINS=" >> $GITHUB_ENV
 
       - name: Show versions
         run: |
+          set -x
           sw_vers
+          xcodebuild -version
+          xcodebuild -showsdks | grep macosx || true
+          which swift
           swift --version
+          echo "TOOLCHAINS=${TOOLCHAINS:-<unset>}"
 
-      - name: Build (release)
-        run: swift build --configuration release
+      - name: Build (verbose)
+        env:
+          TOOLCHAINS: ""   
+        run: |
+          set -euxo pipefail
+          swift build -c release -v
