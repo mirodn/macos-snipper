@@ -27,14 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func takeScreenshot() {
-        Task { @MainActor in
-            switch UserSettings.captureMode {
-            case .full:
-                await ScreenshotService.shared.captureFullScreen()
-            case .area:
-                await ScreenshotService.shared.captureAreaSelection()
-            }
-        }
+        // IMMER erst Vorab-HUD (Mode wählen ←/→, Enter bestätigen)
+        let pre = PreCaptureController()
+        pre.run()
     }
 
     @objc private func showPreferences() {
@@ -47,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showAbout() {
         let alert = NSAlert()
-        alert.messageText = "macOS Snipper v1.0"
+        alert.messageText = "macOS Snipper"
         alert.informativeText = "Lightweight, open-source screenshot tool for macOS."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")

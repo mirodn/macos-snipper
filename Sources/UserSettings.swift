@@ -6,6 +6,11 @@ enum CaptureMode: String {
     case area = "area"    // user-selectable area
 }
 
+extension Notification.Name {
+    /// Fired whenever the capture mode changes.
+    static let captureModeDidChange = Notification.Name("captureModeDidChange")
+}
+
 struct UserSettings {
     private static let savePathKey     = "savePath"
     private static let captureModeKey  = "captureMode"
@@ -40,7 +45,11 @@ struct UserSettings {
             return .full
         }
         set {
+            let old = UserDefaults.standard.string(forKey: captureModeKey)
             UserDefaults.standard.set(newValue.rawValue, forKey: captureModeKey)
+            if old != newValue.rawValue {
+                NotificationCenter.default.post(name: .captureModeDidChange, object: newValue)
+            }
         }
     }
 }

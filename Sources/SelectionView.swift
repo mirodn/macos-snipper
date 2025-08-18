@@ -14,6 +14,8 @@ final class SelectionView: NSView {
     private var currentPoint: NSPoint?
     private var tracking: NSTrackingArea?
     private var cursorPoint: NSPoint = .zero  // position of our drawn crosshair
+    private var hudHovering: Bool = false     // <- NEU: HUD Hover Status
+    private var hoverObs: AnyObject?
 
     // Always consume events (even though the view is transparent)
     override func hitTest(_ point: NSPoint) -> NSView? { self }
@@ -24,9 +26,30 @@ final class SelectionView: NSView {
         wantsLayer = true
         window?.acceptsMouseMovedEvents = true
         window?.invalidateCursorRects(for: self)
-        // Set initial cursor position immediately (without requiring mouse movement)
+
+        // Initial crosshair position (ohne Mausbewegung)
         updateCursorPointFromScreen()
         needsDisplay = true
+
+        // HUD Hover beobachten
+        hoverObs = NotificationCenter.default.addObserver(
+            forName: .hudHoverChanged, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self else { return }
+            if let isHover = note.object as? Bool {
+                hudHovering = isHover
+                // Bei Hover: Crosshair-Zeichnen pausieren
+                needsDisplay = true
+                // Cursor-Rects neu berechnen, damit wir nicht das Crosshair aufzwingen
+                window?.invalidateCursorRects(for: self)
+            }
+        }
+    }
+
+    deinit {
+        if let hoverObs {
+            NotificationCenter.default.removeObserver(hoverObs)
+        }
     }
 
     override func updateTrackingAreas() {
@@ -45,11 +68,18 @@ final class SelectionView: NSView {
     override func resetCursorRects() {
         super.resetCursorRects()
         discardCursorRects()
-        addCursorRect(bounds, cursor: .crosshair)
+        // Nur Crosshair setzen, wenn NICHT über dem HUD
+        if !hudHovering {
+            addCursorRect(bounds, cursor: .crosshair)
+        }
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        NSCursor.crosshair.set()
+        if !hudHovering {
+            NSCursor.crosshair.set()
+        } else {
+            NSCursor.arrow.set()
+        }
     }
 
     // MARK: - Drawing
@@ -86,8 +116,10 @@ final class SelectionView: NSView {
             dimColor.setFill()
             bounds.fill()
 
-            // Draw our own crosshair (visible immediately)
-            if drawCustomCrosshair { drawCrosshair(at: cursorPoint) }
+            // Crosshair nur zeichnen, wenn nicht über HUD
+            if drawCustomCrosshair && !hudHovering {
+                drawCrosshair(at: cursorPoint)
+            }
         }
     }
 

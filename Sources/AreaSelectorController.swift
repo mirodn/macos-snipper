@@ -7,6 +7,7 @@ final class AreaSelectorController {
     private let contentView: SelectionView
     private var continuation: CheckedContinuation<NSRect, Never>?
     private var previousPolicy: NSApplication.ActivationPolicy?
+    private var hud: ModeToggleHUD?
 
     init() {
         let fullFrame = NSScreen.screens.map(\.frame).reduce(NSRect.zero) { $0.union($1) }
@@ -20,7 +21,7 @@ final class AreaSelectorController {
         )
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.level = .statusBar              // try .mainMenu if you need stronger focus
+        window.level = .statusBar
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.ignoresMouseEvents = false
         window.hasShadow = false
@@ -34,10 +35,9 @@ final class AreaSelectorController {
     }
 
     func run() async -> NSRect {
-        // Make sure we are frontmost (helps when running from terminal too)
         previousPolicy = NSApp.activationPolicy()
         #if DEBUG
-        _ = NSApp.setActivationPolicy(.regular) // Dock icon while debugging
+        _ = NSApp.setActivationPolicy(.regular)
         #endif
         NSApp.activate(ignoringOtherApps: true)
 
@@ -47,9 +47,24 @@ final class AreaSelectorController {
         window.invalidateCursorRects(for: contentView)
         contentView.window?.makeFirstResponder(contentView)
 
-        // Hide system cursor; our view draws a custom crosshair immediately
+        // System-Cursor ausblenden (Crosshair zeichnest du selbst)
         NSCursor.hide()
         contentView.needsDisplay = true
+
+        // HUD einblenden (liegt über dem Overlay, nimmt Maus an)
+        hud = ModeToggleHUD { [weak self] newMode in
+            Task { @MainActor in
+                if newMode == .full {
+                    // Sofort zu Full wechseln
+                    await ScreenshotService.shared.captureFullScreen()
+                    self?.cancel()
+                }
+            }
+        }
+        // Auf Screen mit Maus zeigen
+        let mouse = NSEvent.mouseLocation
+        let target = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
+        hud?.show(on: target)
 
         return await withCheckedContinuation { cont in
             continuation = cont
@@ -58,15 +73,29 @@ final class AreaSelectorController {
 
     private func finish(with rect: NSRect) {
         continuation?.resume(returning: rect)
-        continuation = nil
+        cleanup()
+    }
 
-        // Restore system cursor
+    private func cancel() {
+        continuation?.resume(returning: .zero)
+        cleanup()
+    }
+
+    private func cleanup() {
+        continuation = nil
         NSCursor.unhide()
 
         #if DEBUG
         if let prev = previousPolicy { _ = NSApp.setActivationPolicy(prev) }
         #endif
 
+        hud?.orderOut(nil)
+        hud = nil
         window.orderOut(nil)
+    }
+
+    // Optional: HUD relativ zur Auswahl verschieben (callen, wenn du dein Rect kennst)
+    func repositionHUD(above rectInScreen: CGRect, padding: CGFloat = 8) {
+        hud?.reposition(above: rectInScreen, padding: padding)
     }
 }
