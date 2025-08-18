@@ -1,10 +1,11 @@
+// Sources/SelectionView.swift
 import Cocoa
 
 final class SelectionView: NSView {
     /// Wird vom Controller aufgerufen, wenn fertig/abgebrochen.
     var onSelectionComplete: ((NSRect) -> Void)?
 
-    // Darstellung
+    // Overlay & drawing
     var dimAlpha: CGFloat = 0.35
     var borderLineWidth: CGFloat = 2.0
     var drawCustomCrosshair: Bool = true
@@ -13,15 +14,17 @@ final class SelectionView: NSView {
     private var startPoint: NSPoint?
     private var currentPoint: NSPoint?
     private var tracking: NSTrackingArea?
-    private var cursorPoint: NSPoint = .zero
+    private var cursorPoint: NSPoint = .zero  // position of our drawn crosshair
 
     // Aktuelles Auswahlrechteck (standardisiert) – für Enter
     var currentSelectionRect: NSRect? {
         guard let s = startPoint, let c = currentPoint else { return nil }
-        let r = NSRect(x: min(s.x, c.x),
-                       y: min(s.y, c.y),
-                       width: abs(c.x - s.x),
-                       height: abs(c.y - s.y))
+        let r = NSRect(
+            x: min(s.x, c.x),
+            y: min(s.y, c.y),
+            width: abs(c.x - s.x),
+            height: abs(c.y - s.y)
+        )
         return r.standardized
     }
 
@@ -60,27 +63,27 @@ final class SelectionView: NSView {
         NSCursor.crosshair.set()
     }
 
-    // MARK: - Zeichnen
+    // MARK: - Drawing
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         let dimColor = NSColor.black.withAlphaComponent(dimAlpha)
 
         if let rect = currentSelectionRect {
-            // Hintergrund dimmen – Rechteck ausstanzen
+            // Dim everything except the selection rect
             let p = NSBezierPath(rect: bounds)
             p.appendRect(rect)
             p.windingRule = .evenOdd
             dimColor.setFill()
             p.fill()
 
-            // Rahmen
+            // Selection border
             NSColor.white.setStroke()
             let border = NSBezierPath(rect: rect)
             border.lineWidth = borderLineWidth
             border.stroke()
         } else {
-            // Voll dimmen + eigenes Fadenkreuz (optional)
+            // Immediate dimming
             dimColor.setFill()
             bounds.fill()
             if drawCustomCrosshair { drawCrosshair(at: cursorPoint) }
@@ -90,15 +93,23 @@ final class SelectionView: NSView {
     private func drawCrosshair(at p: NSPoint) {
         let path = NSBezierPath()
         let len: CGFloat = 10
+        // Horizontal
         path.move(to: NSPoint(x: p.x - len, y: p.y))
         path.line(to: NSPoint(x: p.x + len, y: p.y))
+        // Vertical
         path.move(to: NSPoint(x: p.x, y: p.y - len))
         path.line(to: NSPoint(x: p.x, y: p.y + len))
-        NSColor.white.setStroke(); path.lineWidth = 1.5; path.stroke()
-        NSColor.black.withAlphaComponent(0.7).setStroke(); path.lineWidth = 0.5; path.stroke()
+
+        NSColor.white.setStroke()
+        path.lineWidth = 1.5
+        path.stroke()
+
+        NSColor.black.withAlphaComponent(0.7).setStroke()
+        path.lineWidth = 0.5
+        path.stroke()
     }
 
-    // MARK: - Maus
+    // MARK: - Mouse
 
     override func mouseMoved(with event: NSEvent) {
         updateCursorPointFromScreen()
@@ -108,7 +119,8 @@ final class SelectionView: NSView {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         let p = convert(event.locationInWindow, from: nil)
-        startPoint = p; currentPoint = p
+        startPoint = p
+        currentPoint = p
         needsDisplay = true
     }
 
@@ -123,11 +135,11 @@ final class SelectionView: NSView {
         onSelectionComplete?(rect)
     }
 
-    // MARK: - Tastatur
+    // MARK: - Keyboard
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
-        case 53: // Esc
+        case 53: // ESC
             onSelectionComplete?(.zero)
 
         case 36, 76: // Return/Enter

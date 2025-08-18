@@ -1,3 +1,4 @@
+// Sources/AreaSelectorController.swift
 import Cocoa
 
 /// Borderless Overlay-Fenster, das Key/Main werden darf – nötig für Tastatur.
@@ -39,10 +40,10 @@ final class AreaSelectorController {
     }
 
     func run() async -> NSRect {
-        // App wirklich in den Vordergrund holen (wichtig für Tastatur)
+        // App sicher nach vorn holen, damit Key-Events ankommen (besonders bei `swift run`)
         previousPolicy = NSApp.activationPolicy()
         #if DEBUG
-        _ = NSApp.setActivationPolicy(.regular) // nur Debug/`swift run`, Release bleibt accessory
+        _ = NSApp.setActivationPolicy(.regular)   // im Release bleibt accessory
         #endif
         NSApp.activate(ignoringOtherApps: true)
 
@@ -52,11 +53,11 @@ final class AreaSelectorController {
         window.invalidateCursorRects(for: contentView)
         contentView.window?.makeFirstResponder(contentView)
 
-        // System-Cursor ausblenden (falls du Crosshair zeichnest)
+        // System-Cursor ausblenden (dein Crosshair malst du selbst)
         NSCursor.hide()
         contentView.needsDisplay = true
 
-        // ←/→/Enter/Esc abfangen (nur solange Overlay aktiv)
+        // ←/→/Enter/Esc lokal abfangen, solange das Overlay aktiv ist
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] ev in
             guard let self = self else { return ev }
             return self.handleKey(ev) ? nil : ev
@@ -69,12 +70,12 @@ final class AreaSelectorController {
 
     private func handleKey(_ e: NSEvent) -> Bool {
         switch e.keyCode {
-        case 53: // Esc → Abbruch
+        case 53: // ESC → Abbruch
             cancel()
             return true
 
-        case 36, 76: // Return/Enter
-            let mode = UserSettings.captureMode   // bei dir ggf. anders benannt
+        case 36, 76: // Return / Enter
+            let mode = UserSettings.captureMode
             if mode == .full {
                 Task { @MainActor in
                     await ScreenshotService.shared.captureFullScreen()
@@ -84,16 +85,16 @@ final class AreaSelectorController {
                 if let r = contentView.currentSelectionRect, r.width > 0, r.height > 0 {
                     finish(with: r)
                 } else {
-                    NSSound.beep() // erst ziehen, dann Enter
+                    NSSound.beep()
                 }
             }
             return true
 
-        case 123: // ←  → Selection/Area
+        case 123: // ← → Selection/Area
             UserSettings.captureMode = .area
             return true
 
-        case 124: // →  → Full Screen
+        case 124: // → → Full Screen
             UserSettings.captureMode = .full
             return true
 
@@ -114,10 +115,12 @@ final class AreaSelectorController {
 
     private func cleanup() {
         continuation = nil
+
         if let m = localKeyMonitor { NSEvent.removeMonitor(m) }
         localKeyMonitor = nil
 
         NSCursor.unhide()
+
         #if DEBUG
         if let prev = previousPolicy { _ = NSApp.setActivationPolicy(prev) }
         #endif
