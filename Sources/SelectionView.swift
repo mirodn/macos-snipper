@@ -1,10 +1,10 @@
-// Sources/SelectionView.swift
 import Cocoa
 
 final class SelectionView: NSView {
+    /// Wird vom Controller aufgerufen, wenn fertig/abgebrochen.
     var onSelectionComplete: ((NSRect) -> Void)?
 
-    // Overlay & drawing
+    // Darstellung
     var dimAlpha: CGFloat = 0.35
     var borderLineWidth: CGFloat = 2.0
     var drawCustomCrosshair: Bool = true
@@ -13,43 +13,29 @@ final class SelectionView: NSView {
     private var startPoint: NSPoint?
     private var currentPoint: NSPoint?
     private var tracking: NSTrackingArea?
-    private var cursorPoint: NSPoint = .zero  // position of our drawn crosshair
-    private var hudHovering: Bool = false     // <- NEU: HUD Hover Status
-    private var hoverObs: AnyObject?
+    private var cursorPoint: NSPoint = .zero
 
-    // Always consume events (even though the view is transparent)
-    override func hitTest(_ point: NSPoint) -> NSView? { self }
+    // Aktuelles Auswahlrechteck (standardisiert) – für Enter
+    var currentSelectionRect: NSRect? {
+        guard let s = startPoint, let c = currentPoint else { return nil }
+        let r = NSRect(x: min(s.x, c.x),
+                       y: min(s.y, c.y),
+                       width: abs(c.x - s.x),
+                       height: abs(c.y - s.y))
+        return r.standardized
+    }
+
+    // Events annehmen
     override var acceptsFirstResponder: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { self }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         wantsLayer = true
         window?.acceptsMouseMovedEvents = true
         window?.invalidateCursorRects(for: self)
-
-        // Initial crosshair position (ohne Mausbewegung)
         updateCursorPointFromScreen()
         needsDisplay = true
-
-        // HUD Hover beobachten
-        hoverObs = NotificationCenter.default.addObserver(
-            forName: .hudHoverChanged, object: nil, queue: .main
-        ) { [weak self] note in
-            guard let self else { return }
-            if let isHover = note.object as? Bool {
-                hudHovering = isHover
-                // Bei Hover: Crosshair-Zeichnen pausieren
-                needsDisplay = true
-                // Cursor-Rects neu berechnen, damit wir nicht das Crosshair aufzwingen
-                window?.invalidateCursorRects(for: self)
-            }
-        }
-    }
-
-    deinit {
-        if let hoverObs {
-            NotificationCenter.default.removeObserver(hoverObs)
-        }
     }
 
     override func updateTrackingAreas() {
@@ -64,90 +50,57 @@ final class SelectionView: NSView {
         addTrackingArea(tracking!)
     }
 
-    // Keep system cursor as crosshair too (optional fallback)
     override func resetCursorRects() {
         super.resetCursorRects()
         discardCursorRects()
-        // Nur Crosshair setzen, wenn NICHT über dem HUD
-        if !hudHovering {
-            addCursorRect(bounds, cursor: .crosshair)
-        }
+        addCursorRect(bounds, cursor: .crosshair)
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        if !hudHovering {
-            NSCursor.crosshair.set()
-        } else {
-            NSCursor.arrow.set()
-        }
+        NSCursor.crosshair.set()
     }
 
-    // MARK: - Drawing
-
-    private var selectionRect: NSRect? {
-        guard let s = startPoint, let c = currentPoint else { return nil }
-        return NSRect(
-            x: min(s.x, c.x),
-            y: min(s.y, c.y),
-            width: abs(c.x - s.x),
-            height: abs(c.y - s.y)
-        )
-    }
+    // MARK: - Zeichnen
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         let dimColor = NSColor.black.withAlphaComponent(dimAlpha)
 
-        if let rect = selectionRect {
-            // Dim everything except the selection rect
+        if let rect = currentSelectionRect {
+            // Hintergrund dimmen – Rechteck ausstanzen
             let p = NSBezierPath(rect: bounds)
             p.appendRect(rect)
             p.windingRule = .evenOdd
             dimColor.setFill()
             p.fill()
 
-            // Selection border
+            // Rahmen
             NSColor.white.setStroke()
             let border = NSBezierPath(rect: rect)
             border.lineWidth = borderLineWidth
             border.stroke()
         } else {
-            // Immediate dimming
+            // Voll dimmen + eigenes Fadenkreuz (optional)
             dimColor.setFill()
             bounds.fill()
-
-            // Crosshair nur zeichnen, wenn nicht über HUD
-            if drawCustomCrosshair && !hudHovering {
-                drawCrosshair(at: cursorPoint)
-            }
+            if drawCustomCrosshair { drawCrosshair(at: cursorPoint) }
         }
     }
 
     private func drawCrosshair(at p: NSPoint) {
         let path = NSBezierPath()
         let len: CGFloat = 10
-        // Horizontal
         path.move(to: NSPoint(x: p.x - len, y: p.y))
         path.line(to: NSPoint(x: p.x + len, y: p.y))
-        // Vertical
         path.move(to: NSPoint(x: p.x, y: p.y - len))
         path.line(to: NSPoint(x: p.x, y: p.y + len))
-
-        // White outline for visibility
-        NSColor.white.setStroke()
-        path.lineWidth = 1.5
-        path.stroke()
-
-        // Slight inner contrast
-        NSColor.black.withAlphaComponent(0.7).setStroke()
-        path.lineWidth = 0.5
-        path.stroke()
+        NSColor.white.setStroke(); path.lineWidth = 1.5; path.stroke()
+        NSColor.black.withAlphaComponent(0.7).setStroke(); path.lineWidth = 0.5; path.stroke()
     }
 
-    // MARK: - Mouse
+    // MARK: - Maus
 
     override func mouseMoved(with event: NSEvent) {
-        // Move our drawn crosshair even when not dragging
         updateCursorPointFromScreen()
         needsDisplay = true
     }
@@ -155,8 +108,7 @@ final class SelectionView: NSView {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         let p = convert(event.locationInWindow, from: nil)
-        startPoint = p
-        currentPoint = p
+        startPoint = p; currentPoint = p
         needsDisplay = true
     }
 
@@ -167,14 +119,25 @@ final class SelectionView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         currentPoint = convert(event.locationInWindow, from: nil)
-        let rect = selectionRect?.standardized ?? .zero
+        let rect = currentSelectionRect ?? .zero
         onSelectionComplete?(rect)
     }
 
+    // MARK: - Tastatur
+
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 { // ESC
+        switch event.keyCode {
+        case 53: // Esc
             onSelectionComplete?(.zero)
-        } else {
+
+        case 36, 76: // Return/Enter
+            if let r = currentSelectionRect, r.width > 0, r.height > 0 {
+                onSelectionComplete?(r)
+            } else {
+                NSSound.beep()
+            }
+
+        default:
             super.keyDown(with: event)
         }
     }

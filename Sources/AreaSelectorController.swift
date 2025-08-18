@@ -1,19 +1,24 @@
-// Sources/AreaSelectorController.swift
 import Cocoa
+
+/// Borderless Overlay-Fenster, das Key/Main werden darf – nötig für Tastatur.
+final class OverlayWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
 
 @MainActor
 final class AreaSelectorController {
-    private let window: NSWindow
+    private let window: OverlayWindow
     private let contentView: SelectionView
     private var continuation: CheckedContinuation<NSRect, Never>?
     private var previousPolicy: NSApplication.ActivationPolicy?
-    private var hud: ModeToggleHUD?
+    private var localKeyMonitor: Any?
 
     init() {
         let fullFrame = NSScreen.screens.map(\.frame).reduce(NSRect.zero) { $0.union($1) }
         contentView = SelectionView()
 
-        window = NSWindow(
+        window = OverlayWindow(
             contentRect: fullFrame,
             styleMask: .borderless,
             backing: .buffered,
@@ -27,7 +32,6 @@ final class AreaSelectorController {
         window.hasShadow = false
         window.contentView = contentView
         window.initialFirstResponder = contentView
-        window.makeKeyAndOrderFront(nil)
 
         contentView.onSelectionComplete = { [weak self] rect in
             self?.finish(with: rect)
@@ -35,9 +39,10 @@ final class AreaSelectorController {
     }
 
     func run() async -> NSRect {
+        // App wirklich in den Vordergrund holen (wichtig für Tastatur)
         previousPolicy = NSApp.activationPolicy()
         #if DEBUG
-        _ = NSApp.setActivationPolicy(.regular)
+        _ = NSApp.setActivationPolicy(.regular) // nur Debug/`swift run`, Release bleibt accessory
         #endif
         NSApp.activate(ignoringOtherApps: true)
 
@@ -47,27 +52,53 @@ final class AreaSelectorController {
         window.invalidateCursorRects(for: contentView)
         contentView.window?.makeFirstResponder(contentView)
 
-        // System-Cursor ausblenden (Crosshair zeichnest du selbst)
+        // System-Cursor ausblenden (falls du Crosshair zeichnest)
         NSCursor.hide()
         contentView.needsDisplay = true
 
-        // HUD einblenden (liegt über dem Overlay, nimmt Maus an)
-        hud = ModeToggleHUD { [weak self] newMode in
-            Task { @MainActor in
-                if newMode == .full {
-                    // Sofort zu Full wechseln
-                    await ScreenshotService.shared.captureFullScreen()
-                    self?.cancel()
-                }
-            }
+        // ←/→/Enter/Esc abfangen (nur solange Overlay aktiv)
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] ev in
+            guard let self = self else { return ev }
+            return self.handleKey(ev) ? nil : ev
         }
-        // Auf Screen mit Maus zeigen
-        let mouse = NSEvent.mouseLocation
-        let target = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
-        hud?.show(on: target)
 
         return await withCheckedContinuation { cont in
             continuation = cont
+        }
+    }
+
+    private func handleKey(_ e: NSEvent) -> Bool {
+        switch e.keyCode {
+        case 53: // Esc → Abbruch
+            cancel()
+            return true
+
+        case 36, 76: // Return/Enter
+            let mode = UserSettings.captureMode   // bei dir ggf. anders benannt
+            if mode == .full {
+                Task { @MainActor in
+                    await ScreenshotService.shared.captureFullScreen()
+                    cancel()
+                }
+            } else {
+                if let r = contentView.currentSelectionRect, r.width > 0, r.height > 0 {
+                    finish(with: r)
+                } else {
+                    NSSound.beep() // erst ziehen, dann Enter
+                }
+            }
+            return true
+
+        case 123: // ←  → Selection/Area
+            UserSettings.captureMode = .area
+            return true
+
+        case 124: // →  → Full Screen
+            UserSettings.captureMode = .full
+            return true
+
+        default:
+            return false
         }
     }
 
@@ -83,19 +114,14 @@ final class AreaSelectorController {
 
     private func cleanup() {
         continuation = nil
-        NSCursor.unhide()
+        if let m = localKeyMonitor { NSEvent.removeMonitor(m) }
+        localKeyMonitor = nil
 
+        NSCursor.unhide()
         #if DEBUG
         if let prev = previousPolicy { _ = NSApp.setActivationPolicy(prev) }
         #endif
 
-        hud?.orderOut(nil)
-        hud = nil
         window.orderOut(nil)
-    }
-
-    // Optional: HUD relativ zur Auswahl verschieben (callen, wenn du dein Rect kennst)
-    func repositionHUD(above rectInScreen: CGRect, padding: CGFloat = 8) {
-        hud?.reposition(above: rectInScreen, padding: padding)
     }
 }
