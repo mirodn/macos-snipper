@@ -1,7 +1,6 @@
-// Sources/AreaSelectorController.swift
 import Cocoa
 
-/// Borderless Overlay-Fenster, das Key/Main werden darf – nötig für Tastatur.
+/// Borderless Overlay-Fenster, das Key/Main werden darf – nötig für Maus-Events stabil.
 final class OverlayWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -13,7 +12,7 @@ final class AreaSelectorController {
     private let contentView: SelectionView
     private var continuation: CheckedContinuation<NSRect, Never>?
     private var previousPolicy: NSApplication.ActivationPolicy?
-    private var localKeyMonitor: Any?
+    private var hud: ModeToggleHUD?
 
     init() {
         let fullFrame = NSScreen.screens.map(\.frame).reduce(NSRect.zero) { $0.union($1) }
@@ -40,66 +39,31 @@ final class AreaSelectorController {
     }
 
     func run() async -> NSRect {
-        // App sicher nach vorn holen, damit Key-Events ankommen (besonders bei `swift run`)
+        // App temporär in den Vordergrund bringen → Panels/Overlays werden zuverlässig gezeigt.
         previousPolicy = NSApp.activationPolicy()
-        #if DEBUG
-        _ = NSApp.setActivationPolicy(.regular)   // im Release bleibt accessory
-        #endif
+        _ = NSApp.setActivationPolicy(.regular)              // <— immer, nicht nur DEBUG
         NSApp.activate(ignoringOtherApps: true)
 
+        // Overlay anzeigen & Crosshair zeichnen
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
         window.acceptsMouseMovedEvents = true
-        window.invalidateCursorRects(for: contentView)
         contentView.window?.makeFirstResponder(contentView)
-
-        // System-Cursor ausblenden (dein Crosshair malst du selbst)
         NSCursor.hide()
         contentView.needsDisplay = true
 
-        // ←/→/Enter/Esc lokal abfangen, solange das Overlay aktiv ist
-        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] ev in
-            guard let self = self else { return ev }
-            return self.handleKey(ev) ? nil : ev
+        // HUD anzeigen (oben-zentriert). Klick auf "Full Screen" löst sofort aus.
+        hud = ModeToggleHUD { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                self.cancel() // Overlay/HUD schließen
+                await ScreenshotService.shared.captureFullScreen()
+            }
         }
+        hud?.show()
 
         return await withCheckedContinuation { cont in
             continuation = cont
-        }
-    }
-
-    private func handleKey(_ e: NSEvent) -> Bool {
-        switch e.keyCode {
-        case 53: // ESC → Abbruch
-            cancel()
-            return true
-
-        case 36, 76: // Return / Enter
-            let mode = UserSettings.captureMode
-            if mode == .full {
-                Task { @MainActor in
-                    await ScreenshotService.shared.captureFullScreen()
-                    cancel()
-                }
-            } else {
-                if let r = contentView.currentSelectionRect, r.width > 0, r.height > 0 {
-                    finish(with: r)
-                } else {
-                    NSSound.beep()
-                }
-            }
-            return true
-
-        case 123: // ← → Selection/Area
-            UserSettings.captureMode = .area
-            return true
-
-        case 124: // → → Full Screen
-            UserSettings.captureMode = .full
-            return true
-
-        default:
-            return false
         }
     }
 
@@ -115,15 +79,13 @@ final class AreaSelectorController {
 
     private func cleanup() {
         continuation = nil
-
-        if let m = localKeyMonitor { NSEvent.removeMonitor(m) }
-        localKeyMonitor = nil
-
         NSCursor.unhide()
 
-        #if DEBUG
+        hud?.orderOut(nil)
+        hud = nil
+
+        // ursprüngliche Aktivierungspolicy wiederherstellen
         if let prev = previousPolicy { _ = NSApp.setActivationPolicy(prev) }
-        #endif
 
         window.orderOut(nil)
     }

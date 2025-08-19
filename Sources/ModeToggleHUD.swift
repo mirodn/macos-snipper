@@ -1,13 +1,12 @@
 import Cocoa
 import SwiftUI
 
-extension Notification.Name {
-    static let hudHoverChanged = Notification.Name("HUDHoverChanged")
-}
+/// Callback wenn der Nutzer im HUD auf "Full Screen" klickt.
+typealias FullScreenTapHandler = () -> Void
 
 private struct ModeToggleView: View {
-    @State private var mode: CaptureMode = UserSettings.captureMode
-    var didChange: (CaptureMode) -> Void
+    @State private var mode: CaptureMode = .area
+    let onFullScreenTap: FullScreenTapHandler
 
     var body: some View {
         HStack(spacing: 10) {
@@ -18,22 +17,16 @@ private struct ModeToggleView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 220)
+            // macOS 14+: neue Signatur mit (old, new)
+            .onChange(of: mode) { _, newMode in
+                if newMode == .full { onFullScreenTap() }
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().stroke(.white.opacity(0.15), lineWidth: 1))
-        .onChange(of: mode) { newMode in
-            UserSettings.captureMode = newMode
-            didChange(newMode)
-        }
-        .onAppear {
-            mode = UserSettings.captureMode
-            NotificationCenter.default.addObserver(forName: .captureModeDidChange, object: nil, queue: .main) { note in
-                if let m = note.object as? CaptureMode { mode = m }
-            }
-        }
+        .onAppear { mode = .area } // immer mit Selection starten
         .onHover { isHover in
-            NotificationCenter.default.post(name: .hudHoverChanged, object: isHover)
             if isHover {
                 NSCursor.unhide()
                 NSCursor.arrow.set()
@@ -46,7 +39,7 @@ private struct ModeToggleView: View {
 final class ModeToggleHUD: NSPanel {
     private var hosting: NSHostingView<ModeToggleView>?
 
-    init(didChange: @escaping (CaptureMode) -> Void) {
+    init(onFullScreenTap: @escaping FullScreenTapHandler) {
         let style: NSWindow.StyleMask = [.nonactivatingPanel, .fullSizeContentView]
         super.init(contentRect: .init(x: 0, y: 0, width: 260, height: 48),
                    styleMask: style, backing: .buffered, defer: false)
@@ -56,7 +49,7 @@ final class ModeToggleHUD: NSPanel {
         backgroundColor = .clear
         hasShadow = true
 
-        // Liegt sicher über dem Overlay
+        // liegt sicher über dem Overlay
         level = .screenSaver
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         titleVisibility = .hidden
@@ -65,7 +58,7 @@ final class ModeToggleHUD: NSPanel {
         worksWhenModal = true
         becomesKeyOnlyIfNeeded = true
 
-        let hv = NSHostingView(rootView: ModeToggleView(didChange: didChange))
+        let hv = NSHostingView(rootView: ModeToggleView(onFullScreenTap: onFullScreenTap))
         hv.translatesAutoresizingMaskIntoConstraints = false
         contentView = hv
         hosting = hv
@@ -76,8 +69,13 @@ final class ModeToggleHUD: NSPanel {
         hv.bottomAnchor.constraint(equalTo: contentView!.bottomAnchor).isActive = true
     }
 
-    func show(on screen: NSScreen? = NSScreen.main, yOffset: CGFloat = 72) {
+    /// Zeigt den HUD oben-zentriert auf dem aktiven Screen (robust, ohne NSScreen.main).
+    func show(yOffset: CGFloat = 72) {
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
+                  ?? NSScreen.screens.first
         guard let screen else { return }
+
         let vf = screen.visibleFrame
         let size = contentView?.fittingSize ?? NSSize(width: 260, height: 48)
         let x = vf.midX - size.width / 2
@@ -86,6 +84,7 @@ final class ModeToggleHUD: NSPanel {
         orderFrontRegardless()
     }
 
+    /// Positioniert HUD über einem Rechteck (z. B. bei aktiver Auswahl).
     func reposition(above rectInScreen: CGRect, padding: CGFloat = 10) {
         let size = contentView?.fittingSize ?? frame.size
         let x = rectInScreen.midX - size.width / 2

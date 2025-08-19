@@ -4,7 +4,6 @@ import ScreenCaptureKit
 
 // MARK: – Dependency Protocols
 
-/// Allows injecting a CGImage capture provider (unit tests).
 protocol ScreenCapturing {
     func captureMainDisplay() -> CGImage?
 }
@@ -15,7 +14,6 @@ struct DefaultCapturer: ScreenCapturing {
     }
 }
 
-/// Allows injecting sound playback (unit tests).
 protocol SoundPlaying {
     func play(_ systemSoundID: SystemSoundID)
 }
@@ -43,21 +41,29 @@ final class ScreenshotService {
         self.soundPlayer = soundPlayer
     }
 
-    /// Generates PNG data of the main display (for unit tests).
-    func makePNGData() -> Data? {
-        guard let cgImage = capturer.captureMainDisplay() else { return nil }
-        let nsImage = NSImage(cgImage: cgImage, size: .zero)
-        guard
-            let tiff = nsImage.tiffRepresentation,
-            let rep  = NSBitmapImageRep(data: tiff),
-            let png  = rep.representation(using: .png, properties: [:])
-        else {
-            return nil
-        }
-        return png
-    }
-
     // MARK: Public API
+
+    /// Einstieg für Hotkey & Menü: Maus-only, startet mit Selection + HUD.
+    func captureInteractiveMouseOnly() async {
+        guard #available(macOS 15, *) else {
+            // Fallback (kein Region-Tool unter 14): direkt Fullscreen
+            await captureFullScreen()
+            return
+        }
+        guard await ensurePermission() else { return }
+
+        let selector = AreaSelectorController()
+        let rect     = await selector.run()
+        // Wenn HUD "Full Screen" geklickt wurde, hat AreaSelectorController bereits Fullscreen ausgelöst.
+        // rect == .zero → nichts weiter zu tun.
+        guard rect != .zero else { return }
+
+        if let shot = await captureRegion(rect) {
+            finalize(shot)
+        } else {
+            print("ScreenCaptureKit area selection failed")
+        }
+    }
 
     /// Captures the entire main display.
     func captureFullScreen() async {
@@ -76,32 +82,11 @@ final class ScreenshotService {
                 print("ScreenCaptureKit full-screen failed")
             }
         } else {
-            // Legacy path for macOS 14.x
             guard let cg = capturer.captureMainDisplay() else {
                 print("Legacy CGDisplayCreateImage failed")
                 return
             }
             finalize(NSImage(cgImage: cg, size: .zero))
-        }
-    }
-
-    /// Lets the user drag out a rectangle, then captures that area.
-    func captureAreaSelection() async {
-        guard #available(macOS 15, *) else {
-            print("Area selection requires macOS 15+")
-            return
-        }
-        guard await ensurePermission() else {
-            print("Screen-capture permission denied")
-            return
-        }
-
-        let selector = AreaSelectorController()
-        let rect     = await selector.run()
-        if let shot = await captureRegion(rect) {
-            finalize(shot)
-        } else {
-            print("ScreenCaptureKit area selection failed")
         }
     }
 
@@ -164,7 +149,8 @@ final class ScreenshotService {
         }
 
         let myPID = NSRunningApplication.current.processIdentifier
-        let meApp = (try? await share.applications)?.first { $0.processID == myPID }
+        let meApp = share.applications.first { $0.processID == myPID }
+
 
         guard let scDisplay = share.displays.first(where: { $0.displayID == did }) else {
             return nil
@@ -209,7 +195,6 @@ final class ScreenshotService {
 
 // MARK: – Tiny Binding Helper
 private extension SCStreamConfiguration {
-    /// Allows inline mutation returning self.
     func then(_ block: (SCStreamConfiguration) -> Void) -> SCStreamConfiguration {
         block(self)
         return self

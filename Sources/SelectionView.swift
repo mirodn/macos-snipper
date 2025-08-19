@@ -1,4 +1,3 @@
-// Sources/SelectionView.swift
 import Cocoa
 
 final class SelectionView: NSView {
@@ -16,7 +15,7 @@ final class SelectionView: NSView {
     private var tracking: NSTrackingArea?
     private var cursorPoint: NSPoint = .zero  // position of our drawn crosshair
 
-    // Aktuelles Auswahlrechteck (standardisiert) – für Enter
+    // Aktuelles Auswahlrechteck (standardisiert) – für Abschluss
     var currentSelectionRect: NSRect? {
         guard let s = startPoint, let c = currentPoint else { return nil }
         let r = NSRect(
@@ -69,7 +68,7 @@ final class SelectionView: NSView {
         super.draw(dirtyRect)
         let dimColor = NSColor.black.withAlphaComponent(dimAlpha)
 
-        if let rect = currentSelectionRect {
+        if let rect = currentSelectionRect, rect.width > 0, rect.height > 0 {
             // Dim everything except the selection rect
             let p = NSBezierPath(rect: bounds)
             p.appendRect(rect)
@@ -133,25 +132,6 @@ final class SelectionView: NSView {
         currentPoint = convert(event.locationInWindow, from: nil)
         let rect = currentSelectionRect ?? .zero
         onSelectionComplete?(rect)
-    }
-
-    // MARK: - Keyboard
-
-    override func keyDown(with event: NSEvent) {
-        switch event.keyCode {
-        case 53: // ESC
-            onSelectionComplete?(.zero)
-
-        case 36, 76: // Return/Enter
-            if let r = currentSelectionRect, r.width > 0, r.height > 0 {
-                onSelectionComplete?(r)
-            } else {
-                NSSound.beep()
-            }
-
-        default:
-            super.keyDown(with: event)
-        }
     }
 
     // MARK: - Helpers

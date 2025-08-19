@@ -27,9 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func takeScreenshot() {
-        // IMMER erst Vorab-HUD (Mode wählen ←/→, Enter bestätigen)
-        let pre = PreCaptureController()
-        pre.run()
+        Task { @MainActor in
+            await ScreenshotService.shared.captureInteractiveMouseOnly()
+        }
     }
 
     @objc private func showPreferences() {
@@ -53,7 +53,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false
-    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }

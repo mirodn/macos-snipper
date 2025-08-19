@@ -12,9 +12,9 @@ final class HotkeyManager {
                 event.charactersIgnoringModifiers?.lowercased() == "s"
             else { return }
 
-            // Einheitliches Verhalten: Vorab-HUD
-            let pre = PreCaptureController()
-            pre.run()
+            Task { @MainActor in
+                await ScreenshotService.shared.captureInteractiveMouseOnly()
+            }
         }
     }
 }
