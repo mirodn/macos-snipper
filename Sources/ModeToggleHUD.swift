@@ -1,7 +1,7 @@
 import Cocoa
 import SwiftUI
 
-/// Callback wenn der Nutzer im HUD auf "Full Screen" klickt.
+/// Callback when the user taps "Full Screen" in the HUD.
 typealias FullScreenTapHandler = () -> Void
 
 private struct ModeToggleView: View {
@@ -17,7 +17,7 @@ private struct ModeToggleView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 220)
-            // macOS 14+: neue Signatur mit (old, new)
+            // macOS 14+: new signature with (old, new)
             .onChange(of: mode) { _, newMode in
                 if newMode == .full { onFullScreenTap() }
             }
@@ -25,7 +25,7 @@ private struct ModeToggleView: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().stroke(.white.opacity(0.15), lineWidth: 1))
-        .onAppear { mode = .area } // immer mit Selection starten
+        .onAppear { mode = .area } // always start with Selection
         .onHover { isHover in
             if isHover {
                 NSCursor.unhide()
@@ -49,7 +49,7 @@ final class ModeToggleHUD: NSPanel {
         backgroundColor = .clear
         hasShadow = true
 
-        // liegt sicher über dem Overlay
+        // always displayed above the overlay
         level = .screenSaver
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         titleVisibility = .hidden
@@ -69,7 +69,7 @@ final class ModeToggleHUD: NSPanel {
         hv.bottomAnchor.constraint(equalTo: contentView!.bottomAnchor).isActive = true
     }
 
-    /// Zeigt den HUD oben-zentriert auf dem aktiven Screen (robust, ohne NSScreen.main).
+    /// Shows the HUD centered at the top of the active screen (robust, without relying on NSScreen.main).
     func show(yOffset: CGFloat = 72) {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
@@ -84,7 +84,7 @@ final class ModeToggleHUD: NSPanel {
         orderFrontRegardless()
     }
 
-    /// Positioniert HUD über einem Rechteck (z. B. bei aktiver Auswahl).
+    /// Positions the HUD above a rectangle (e.g. above the current selection).
     func reposition(above rectInScreen: CGRect, padding: CGFloat = 10) {
         let size = contentView?.fittingSize ?? frame.size
         let x = rectInScreen.midX - size.width / 2

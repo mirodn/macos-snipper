@@ -1,7 +1,7 @@
 import Cocoa
 
 final class SelectionView: NSView {
-    /// Wird vom Controller aufgerufen, wenn fertig/abgebrochen.
+    /// Called when user completes selection (mouse up). Rect is in screen coordinates.
     var onSelectionComplete: ((NSRect) -> Void)?
 
     // Overlay & drawing
@@ -15,7 +15,7 @@ final class SelectionView: NSView {
     private var tracking: NSTrackingArea?
     private var cursorPoint: NSPoint = .zero  // position of our drawn crosshair
 
-    // Aktuelles Auswahlrechteck (standardisiert) – für Abschluss
+    // Computed selection rect (nil if not started)
     var currentSelectionRect: NSRect? {
         guard let s = startPoint, let c = currentPoint else { return nil }
         let r = NSRect(

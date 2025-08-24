@@ -2,7 +2,7 @@ import Cocoa
 
 @MainActor
 final class PreCaptureController {
-    /// Startet direkt die neue Maus-only Interaktion.
+    /// Called from AppDelegate menu or HotkeyManager
     func run() {
         Task { @MainActor in
             await ScreenshotService.shared.captureInteractiveMouseOnly()

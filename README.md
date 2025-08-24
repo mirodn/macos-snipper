@@ -31,6 +31,25 @@ A lightweight **open-source screenshot tool for macOS**, inspired by Windows Sni
   - **Screen Recording**
   - **Input Monitoring**
 
+## Development
+
+### Setting up Development Environment
+
+To contribute or test changes to **macos-snipper**, you can build and run the app locally with the provided `Makefile`.
+
+#### Common Commands
+
+| Command               | Description     |
+| --------------------- | --------------- |
+| `make build`         | Build the app   |
+| `make build-universal` | Build universal binary (Intel + Apple Silicon) |
+| `make bundle`        | Create app bundle |
+| `make sign`          | Code sign the app |
+| `make run-local`     | Run the app locally |
+| `make show-app`      | Open the built app in Finder |
+| `make tcc-reset`     | Reset TCC permissions for the app |
+|`make uninstall-local` | Uninstall the locally built app |
+
 ## Contribution
 
 Contributions are welcome!

@@ -43,10 +43,10 @@ final class ScreenshotService {
 
     // MARK: Public API
 
-    /// Einstieg für Hotkey & Menü: Maus-only, startet mit Selection + HUD.
+    /// Interactive screenshot: user selects a region with the mouse.
     func captureInteractiveMouseOnly() async {
         guard #available(macOS 15, *) else {
-            // Fallback (kein Region-Tool unter 14): direkt Fullscreen
+            // Fallback for macOS 14 and earlier: full-screen capture only
             await captureFullScreen()
             return
         }
@@ -54,8 +54,6 @@ final class ScreenshotService {
 
         let selector = AreaSelectorController()
         let rect     = await selector.run()
-        // Wenn HUD "Full Screen" geklickt wurde, hat AreaSelectorController bereits Fullscreen ausgelöst.
-        // rect == .zero → nichts weiter zu tun.
         guard rect != .zero else { return }
 
         if let shot = await captureRegion(rect) {

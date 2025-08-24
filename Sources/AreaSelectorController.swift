@@ -1,6 +1,6 @@
 import Cocoa
 
-/// Borderless Overlay-Fenster, das Key/Main werden darf – nötig für Maus-Events stabil.
+/// Borderless overlay window
 final class OverlayWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -15,6 +15,7 @@ final class AreaSelectorController {
     private var hud: ModeToggleHUD?
 
     init() {
+        // Cover all screens
         let fullFrame = NSScreen.screens.map(\.frame).reduce(NSRect.zero) { $0.union($1) }
         contentView = SelectionView()
 
@@ -39,12 +40,12 @@ final class AreaSelectorController {
     }
 
     func run() async -> NSRect {
-        // App temporär in den Vordergrund bringen → Panels/Overlays werden zuverlässig gezeigt.
+        // Temporarily bring the app to the foreground → ensures overlays/panels are shown reliably
         previousPolicy = NSApp.activationPolicy()
-        _ = NSApp.setActivationPolicy(.regular)              // <— immer, nicht nur DEBUG
+        _ = NSApp.setActivationPolicy(.regular)              // <— always, not only in DEBUG
         NSApp.activate(ignoringOtherApps: true)
 
-        // Overlay anzeigen & Crosshair zeichnen
+        // Show overlay & draw crosshair
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
         window.acceptsMouseMovedEvents = true
@@ -52,11 +53,11 @@ final class AreaSelectorController {
         NSCursor.hide()
         contentView.needsDisplay = true
 
-        // HUD anzeigen (oben-zentriert). Klick auf "Full Screen" löst sofort aus.
+        // Show HUD (centered at top). Clicking "Full Screen" triggers immediately.
         hud = ModeToggleHUD { [weak self] in
             guard let self else { return }
             Task { @MainActor in
-                self.cancel() // Overlay/HUD schließen
+                self.cancel() // Close overlay/HUD
                 await ScreenshotService.shared.captureFullScreen()
             }
         }
@@ -84,7 +85,7 @@ final class AreaSelectorController {
         hud?.orderOut(nil)
         hud = nil
 
-        // ursprüngliche Aktivierungspolicy wiederherstellen
+        // Restore the previous activation policy
         if let prev = previousPolicy { _ = NSApp.setActivationPolicy(prev) }
 
         window.orderOut(nil)
